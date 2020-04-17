@@ -28,10 +28,10 @@
 # define SHUT_RDWR 2
 # define close closesocket
 #elif defined(ARDUINO)
-#ifndef DEBUG
-#define printf(...) {}
-#define fprintf(...) {}
-#endif
+// #ifndef DEBUG
+// #define printf(...) {}
+// #define fprintf(...) {}
+// #endif
 #else
 # include <sys/socket.h>
 # include <sys/ioctl.h>
@@ -88,8 +88,10 @@ static int _modbus_tcp_init_win32(void)
     WSADATA wsaData;
 
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+#ifdef DEBUG
         fprintf(stderr, "WSAStartup() returned error code %d\n",
                 (unsigned int)GetLastError());
+#endif
         errno = EIO;
         return -1;
     }
@@ -239,20 +241,24 @@ static int _modbus_tcp_pre_check_confirmation(modbus_t *ctx, const uint8_t *req,
 #endif
     /* Check transaction ID */
     if (req[0] != rsp[0] || req[1] != rsp[1]) {
-        if (ctx->debug) {
+#ifdef DEBUG
+        if (ctx->debug)
             fprintf(stderr, "Invalid transaction ID received 0x%X (not 0x%X)\n",
                     (rsp[0] << 8) + rsp[1], (req[0] << 8) + req[1]);
         }
+#endif
         errno = EMBBADDATA;
         return -1;
     }
 
     /* Check protocol ID */
     if (rsp[2] != 0x0 && rsp[3] != 0x0) {
+#ifdef DEBUG
         if (ctx->debug) {
             fprintf(stderr, "Invalid protocol ID received 0x%X (not 0x0)\n",
                     (rsp[2] << 8) + rsp[3]);
         }
+#endif
         errno = EMBBADDATA;
         return -1;
     }
@@ -394,9 +400,11 @@ static int _modbus_tcp_connect(modbus_t *ctx)
         return -1;
     }
 
+#ifdef DEBUG
     if (ctx->debug) {
         printf("Connecting to %s:%d\n", ctx_tcp->ip, ctx_tcp->port);
     }
+#endif
 
     addr.sin_family = AF_INET;
     addr.sin_port = htons(ctx_tcp->port);
@@ -442,9 +450,11 @@ static int _modbus_tcp_pi_connect(modbus_t *ctx)
     rc = getaddrinfo(ctx_tcp_pi->node, ctx_tcp_pi->service,
                      &ai_hints, &ai_list);
     if (rc != 0) {
+#ifdef DEBUG
         if (ctx->debug) {
             fprintf(stderr, "Error returned by getaddrinfo: %s\n", gai_strerror(rc));
         }
+#endif
         errno = ECONNREFUSED;
         return -1;
     }
@@ -468,9 +478,11 @@ static int _modbus_tcp_pi_connect(modbus_t *ctx)
         if (ai_ptr->ai_family == AF_INET)
             _modbus_tcp_set_ipv4_options(s);
 
+#ifdef DEBUG
         if (ctx->debug) {
             printf("Connecting to [%s]:%s\n", ctx_tcp_pi->node, ctx_tcp_pi->service);
         }
+#endif
 
         rc = _connect(s, ai_ptr->ai_addr, ai_ptr->ai_addrlen, &ctx->response_timeout);
         if (rc == -1) {
@@ -674,9 +686,11 @@ int modbus_tcp_pi_listen(modbus_t *ctx, int nb_connection)
     ai_list = NULL;
     rc = getaddrinfo(node, service, &ai_hints, &ai_list);
     if (rc != 0) {
+#ifdef DEBUG
         if (ctx->debug) {
             fprintf(stderr, "Error returned by getaddrinfo: %s\n", gai_strerror(rc));
         }
+#endif
         errno = ECONNREFUSED;
         return -1;
     }
@@ -779,10 +793,12 @@ int modbus_tcp_accept(modbus_t *ctx, int *s)
         return -1;
     }
 
+#ifdef DEBUG
     if (ctx->debug) {
         printf("The client connection from %s is accepted\n",
                inet_ntoa(addr.sin_addr));
     }
+#endif
 
     return ctx->s;
 #endif
@@ -811,9 +827,11 @@ int modbus_tcp_pi_accept(modbus_t *ctx, int *s)
         *s = -1;
     }
 
+#ifdef DEBUG
     if (ctx->debug) {
         printf("The client connection is accepted.\n");
     }
+#endif
 
     return ctx->s;
 }
@@ -840,9 +858,11 @@ static int _modbus_tcp_select(modbus_t *ctx, fd_set *rset, struct timeval *tv, i
 #else
     while ((s_rc = select(ctx->s+1, rset, NULL, NULL, tv)) == -1) {
         if (errno == EINTR) {
+#ifdef DEBUG
             if (ctx->debug) {
                 fprintf(stderr, "A non blocked signal was caught\n");
             }
+#endif
             /* Necessary after an error */
             FD_ZERO(rset);
             FD_SET(ctx->s, rset);
@@ -933,7 +953,9 @@ modbus_t* modbus_new_tcp(const char *ip, int port)
     sa.sa_handler = SIG_IGN;
     if (sigaction(SIGPIPE, &sa, NULL) < 0) {
         /* The debug flag can't be set here... */
+#ifdef DEBUG
         fprintf(stderr, "Coud not install SIGPIPE handler.\n");
+#endif
         return NULL;
     }
 #endif
@@ -957,14 +979,18 @@ modbus_t* modbus_new_tcp(const char *ip, int port)
         dest_size = sizeof(char) * 16;
         ret_size = strlcpy(ctx_tcp->ip, ip, dest_size);
         if (ret_size == 0) {
+#ifdef DEBUG
             fprintf(stderr, "The IP string is empty\n");
+#endif
             modbus_free(ctx);
             errno = EINVAL;
             return NULL;
         }
 
         if (ret_size >= dest_size) {
+#ifdef DEBUG
             fprintf(stderr, "The IP string has been truncated\n");
+#endif
             modbus_free(ctx);
             errno = EINVAL;
             return NULL;
@@ -1006,14 +1032,18 @@ modbus_t* modbus_new_tcp_pi(const char *node, const char *service)
         dest_size = sizeof(char) * _MODBUS_TCP_PI_NODE_LENGTH;
         ret_size = strlcpy(ctx_tcp_pi->node, node, dest_size);
         if (ret_size == 0) {
+#ifdef DEBUG
             fprintf(stderr, "The node string is empty\n");
+#endif
             modbus_free(ctx);
             errno = EINVAL;
             return NULL;
         }
 
         if (ret_size >= dest_size) {
+#ifdef DEBUG
             fprintf(stderr, "The node string has been truncated\n");
+#endif
             modbus_free(ctx);
             errno = EINVAL;
             return NULL;
@@ -1029,14 +1059,18 @@ modbus_t* modbus_new_tcp_pi(const char *node, const char *service)
     }
 
     if (ret_size == 0) {
+#ifdef DEBUG
         fprintf(stderr, "The service string is empty\n");
+#endif
         modbus_free(ctx);
         errno = EINVAL;
         return NULL;
     }
 
     if (ret_size >= dest_size) {
+#ifdef DEBUG
         fprintf(stderr, "The service string has been truncated\n");
+#endif
         modbus_free(ctx);
         errno = EINVAL;
         return NULL;
