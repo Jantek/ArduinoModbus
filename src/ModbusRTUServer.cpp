@@ -34,7 +34,7 @@ ModbusRTUServerClass::~ModbusRTUServerClass()
 {
 }
 
-int ModbusRTUServerClass::begin(int id, unsigned long baudrate, uint16_t config)
+int ModbusRTUServerClass::begin(int id, unsigned long baudrate, int config)
 {
   modbus_t* mb = modbus_new_rtu(baudrate, config);
 
